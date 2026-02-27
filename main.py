@@ -2,7 +2,6 @@ import math
 import random
 import sys
 from dataclasses import dataclass
-
 import pygame
 
 
@@ -14,6 +13,8 @@ BULLET_SPEED = 650
 ENEMY_SPEED = 110
 RAID_TIME = 180
 TARGET_LOOT_VALUE = 1000
+EXTRACT_HOLD_TIME = 2.0
+RELOAD_EPSILON = 1e-6
 
 
 @dataclass
@@ -83,6 +84,10 @@ class Player:
         self.hp = 100
         self.loot_value = 0
         self.shoot_cd = 0.0
+        self.mag_size = 20
+        self.ammo = self.mag_size
+        self.reload_time = 1.6
+        self.reload_timer = 0.0
 
     def update(self, dt: float, keys: pygame.key.ScancodeWrapper) -> None:
         dx = keys[pygame.K_d] - keys[pygame.K_a]
@@ -96,14 +101,25 @@ class Player:
         self.x = max(self.radius, min(MAP_W - self.radius, self.x))
         self.y = max(self.radius, min(MAP_H - self.radius, self.y))
         self.shoot_cd = max(0.0, self.shoot_cd - dt)
+        self.reload_timer = max(0.0, self.reload_timer - dt)
+        if self.reload_timer <= RELOAD_EPSILON and self.ammo == 0:
+            self.reload_timer = 0.0
+            self.ammo = self.mag_size
 
     def can_shoot(self) -> bool:
-        return self.shoot_cd <= 0
+        return self.shoot_cd <= 0 and self.reload_timer <= 0 and self.ammo > 0
+
+    def start_reload(self) -> None:
+        if self.ammo < self.mag_size and self.reload_timer <= 0:
+            self.reload_timer = self.reload_time
 
     def shoot(self, target_world: tuple[float, float]) -> Bullet:
         tx, ty = target_world
         angle = math.atan2(ty - self.y, tx - self.x)
         self.shoot_cd = 0.2
+        self.ammo -= 1
+        if self.ammo == 0:
+            self.start_reload()
         return Bullet(self.x, self.y, angle)
 
 
@@ -127,6 +143,7 @@ class Game:
         self.game_over = False
         self.win = False
         self.message = ""
+        self.extract_progress = 0.0
 
         for _ in range(18):
             self.loot.append(
@@ -196,7 +213,11 @@ class Game:
         elif self.time_left <= 0:
             self.end_game(False, "超时未撤离，行动失败！")
         elif player_in_extract and self.player.loot_value >= TARGET_LOOT_VALUE:
-            self.end_game(True, "成功撤离！你带出了高价值物资。")
+            self.extract_progress = min(EXTRACT_HOLD_TIME, self.extract_progress + dt)
+            if self.extract_progress >= EXTRACT_HOLD_TIME:
+                self.end_game(True, "成功撤离！你带出了高价值物资。")
+        else:
+            self.extract_progress = max(0.0, self.extract_progress - dt * 2)
 
     def end_game(self, win: bool, message: str) -> None:
         self.game_over = True
@@ -252,11 +273,23 @@ class Game:
             f"HP: {int(self.player.hp)}",
             f"物资价值: {self.player.loot_value}/{TARGET_LOOT_VALUE}",
             f"剩余时间: {int(self.time_left)}s",
+            f"弹药: {self.player.ammo}/{self.player.mag_size}"
+            + (" (换弹中)" if self.player.reload_timer > 0 else ""),
             "操作: WASD移动 | 鼠标左键射击 | 去撤离区并带够物资",
         ]
         for i, line in enumerate(hud):
             txt = self.font.render(line, True, (240, 240, 240))
             self.screen.blit(txt, (18, 16 + i * 28))
+
+        if self.extract_progress > 0 and not self.game_over:
+            p = self.extract_progress / EXTRACT_HOLD_TIME
+            bar_w, bar_h = 280, 20
+            bar_x = WIDTH // 2 - bar_w // 2
+            bar_y = 22
+            pygame.draw.rect(self.screen, (45, 45, 45), (bar_x, bar_y, bar_w, bar_h), border_radius=8)
+            pygame.draw.rect(self.screen, (85, 230, 120), (bar_x, bar_y, int(bar_w * p), bar_h), border_radius=8)
+            tip = self.font.render("撤离中...保持位置", True, (230, 255, 230))
+            self.screen.blit(tip, (WIDTH // 2 - 90, bar_y + 24))
 
         if self.game_over:
             panel = pygame.Rect(WIDTH // 2 - 260, HEIGHT // 2 - 120, 520, 240)
@@ -277,9 +310,11 @@ class Game:
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
-                    elif event.key == pygame.K_r and self.game_over:
-                        self.__init__()
-                        return self.run()
+                    elif event.key == pygame.K_r:
+                        if self.game_over:
+                            self.__init__()
+                            return self.run()
+                        self.player.start_reload()
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not self.game_over:
                     if self.player.can_shoot():
                         self.bullets.append(self.player.shoot(self.screen_to_world(*event.pos)))
