@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>搜打撤 2D Prototype</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-shell">
+    <canvas id="gameCanvas" width="960" height="540"></canvas>
+
+    <div id="hud-left" class="hud-panel"></div>
+    <div id="hud-right" class="hud-panel"></div>
+    <div id="hint-bar"></div>
+    <button id="download-btn" title="下载项目文件">Download to Desktop</button>
+
+    <div id="menu-overlay" class="overlay">
+      <div class="panel">
+        <h1>搜打撤原型</h1>
+        <p id="meta-gold-text">总资产：0 Gold</p>
+        <div class="btn-row">
+          <button id="start-btn">开始行动</button>
+          <button id="upgrade-btn">升级</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="upgrade-overlay" class="overlay hidden">
+      <div class="panel">
+        <h2>局外升级</h2>
+        <p id="upgrade-gold-text">可用资产：0 Gold</p>
+        <div id="upgrade-list"></div>
+        <div class="btn-row">
+          <button id="back-menu-btn">返回菜单</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="result-overlay" class="overlay hidden">
+      <div class="panel">
+        <h2 id="result-title">结算</h2>
+        <p id="result-text"></p>
+        <div class="btn-row">
+          <button id="restart-btn">再来一局</button>
+          <button id="to-menu-btn">返回菜单</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
